@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "mcp-ariba": {
+      "command": "node",
+      "args": ["C:\\Users\\H26014\\mcp-ariba\\dist\\index.js"]
+    }
+  }
+}
