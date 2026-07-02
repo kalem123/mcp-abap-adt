@@ -8,6 +8,30 @@ This project provides a server that allows you to interact with SAP ABAP systems
   <img width="380" height="200" src="https://glama.ai/mcp/servers/gwkh12xlu7/badge" alt="ABAP ADT MCP server" />
 </a>
 
+## Neues Setup bei einem anderen Kunden (neuer Rechner + neues SAP-System)
+
+Für ein komplett neues Setup bei einem anderen Kunden brauchst du zwei getrennte Teile: Client-Seite (Rechner) und SAP-Seite (System).
+
+### 1. Client-Seite (neuer Rechner)
+- Node.js installieren (falls nicht vorhanden)
+- `git clone https://github.com/kalem123/mcp-abap-adt.git`
+- `npm install` und `npm run build`
+- `.env` aus `.env.example` neu anlegen mit den Zugangsdaten des neuen Kunden-Systems (URL, User, Client, Passwort/Auth, `TLS_REJECT_UNAUTHORIZED=0` falls Zertifikat selbstsigniert)
+- MCP-Server in Claude Code registrieren (`.mcp.json` bzw. `claude mcp add`, zeigt auf den lokalen `dist`-Ordner)
+
+### 2. SAP-Seite (im Zielsystem, einmalig)
+- Klasse `ZCL_TABLECONTENT` in SE24/ADT anlegen und aktivieren (Quelltext liegt als `ZCL_TABLECONTENT.txt` im Repo)
+- SICF-Knoten `/z_util/z_tablecontent` anlegen (zwei Ebenen: `z_util` als Container, `z_tablecontent` mit Handler-Klasse `ZCL_TABLECONTENT`), Service aktivieren
+- Kurzer Test direkt im Browser: `https://<host>:<port>/z_util/z_tablecontent/T000?maxRows=5` sollte JSON liefern
+
+### 3. Verifizieren
+- Claude Code neu starten (frischer Node-Prozess für den MCP-Server)
+- Testabfrage einer Standardtabelle (`T000`) über `GetTableContents`
+
+Wichtig: Berechtigungen des SAP-Users beim Kunden müssen `S_TABU_DIS` für die relevante Berechtigungsgruppe(n) enthalten, sonst blockt der `AUTHORITY-CHECK` in der Klasse.
+
+---
+
 This guide is designed for beginners, so we'll walk through everything step-by-step.  We'll cover:
 
 1.  **Prerequisites:** What you need before you start.
