@@ -23,7 +23,9 @@ export function return_error(error: any) {
     let message: string;
     if (error instanceof AxiosError) {
         message = error.response?.data
-            ? String(error.response.data)
+            ? (typeof error.response.data === 'string'
+                ? error.response.data
+                : JSON.stringify(error.response.data, null, 2))
             : `${error.message} (${error.code ?? 'no code'})`;
     } else if (error instanceof Error) {
         message = error.message;
