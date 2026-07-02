@@ -1,0 +1,207 @@
+*&---------------------------------------------------------------------*
+*& Handlerklasse fuer SICF-Knoten /z_util/z_tablecontent
+*&---------------------------------------------------------------------*
+*& Generischer Tabelleninhalt-Reader, aufgerufen per:
+*&   GET /z_util/z_tablecontent/<TABLE_NAME>?maxRows=<n>
+*&
+*& Liefert den Inhalt einer beliebigen DB-Tabelle als JSON zurueck.
+*& Tabellenname kommt aus dem URL-Pfad (PATH_INFO), maxRows aus dem
+*& Query-String. Da der Tabellenname Nutzereingabe ist, wird er gegen
+*& DD02L verifiziert (nur real existierende, transparente Tabellen)
+*& und zusaetzlich per AUTHORITY-CHECK auf S_TABU_DIS abgesichert -
+*& ohne das waere der Service ein ungeschuetzter Tabellen-Dump-Endpunkt,
+*& der die normalen SAP-Berechtigungspruefungen umgeht.
+*&---------------------------------------------------------------------*
+CLASS zcl_tablecontent DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC.
+
+  PUBLIC SECTION.
+    INTERFACES if_http_extension.
+
+  PRIVATE SECTION.
+    CONSTANTS gc_max_rows_hard_limit TYPE i VALUE 5000.
+
+    METHODS:
+      get_table_name
+        IMPORTING io_request       TYPE REF TO if_http_request
+        RETURNING VALUE(rv_table)  TYPE tabname,
+
+      get_max_rows
+        IMPORTING io_request        TYPE REF TO if_http_request
+        RETURNING VALUE(rv_maxrows) TYPE i,
+
+      table_exists
+        IMPORTING iv_table         TYPE tabname
+        RETURNING VALUE(rv_exists) TYPE abap_bool,
+
+      authority_check
+        IMPORTING iv_table          TYPE tabname
+        RETURNING VALUE(rv_allowed) TYPE abap_bool,
+
+      read_table_dynamic
+        IMPORTING iv_table       TYPE tabname
+                  iv_maxrows     TYPE i
+        RETURNING VALUE(rv_json) TYPE string,
+
+      send_error
+        IMPORTING io_response TYPE REF TO if_http_response
+                  iv_code     TYPE i
+                  iv_message  TYPE string.
+
+ENDCLASS.
+
+
+CLASS zcl_tablecontent IMPLEMENTATION.
+
+  METHOD if_http_extension~handle_request.
+
+    DATA(lv_table)   = get_table_name( server->request ).
+    DATA(lv_maxrows) = get_max_rows( server->request ).
+
+    IF lv_table IS INITIAL.
+      send_error( io_response = server->response
+                  iv_code     = 400
+                  iv_message  = 'Table name missing in URL path.' ).
+      RETURN.
+    ENDIF.
+
+    IF table_exists( lv_table ) = abap_false.
+      send_error( io_response = server->response
+                  iv_code     = 404
+                  iv_message  = |Table { lv_table } does not exist or is not a transparent table.| ).
+      RETURN.
+    ENDIF.
+
+    IF authority_check( lv_table ) = abap_false.
+      send_error( io_response = server->response
+                  iv_code     = 403
+                  iv_message  = |No authorization to display contents of table { lv_table }.| ).
+      RETURN.
+    ENDIF.
+
+    TRY.
+        DATA(lv_json) = read_table_dynamic( iv_table   = lv_table
+                                             iv_maxrows = lv_maxrows ).
+
+        server->response->set_status( code = 200 reason = 'OK' ).
+        server->response->set_header_field( name = 'content-type' value = 'application/json; charset=utf-8' ).
+        server->response->set_cdata( lv_json ).
+
+      CATCH cx_root INTO DATA(lx_error).
+        send_error( io_response = server->response
+                    iv_code     = 500
+                    iv_message  = lx_error->get_text( ) ).
+    ENDTRY.
+
+  ENDMETHOD.
+
+
+  METHOD get_table_name.
+
+    DATA(lv_path) = io_request->get_header_field( '~path_info' ).
+    " ~path_info liefert alles nach dem SICF-Knoten, z.B. "/CDHDR"
+    SHIFT lv_path LEFT DELETING LEADING '/'.
+
+    " Falls noch weitere Segmente/Query-Reste enthalten sind: nur erstes Segment nehmen
+    FIND REGEX '^[A-Za-z0-9_/]+' IN lv_path MATCH OFFSET DATA(lv_off) MATCH LENGTH DATA(lv_len).
+    IF sy-subrc = 0.
+      lv_path = lv_path+lv_off(lv_len).
+    ENDIF.
+
+    rv_table = to_upper( lv_path ).
+
+  ENDMETHOD.
+
+
+  METHOD get_max_rows.
+
+    DATA(lv_param) = io_request->get_form_field( name = 'maxRows' ).
+
+    IF lv_param IS NOT INITIAL AND lv_param CO '0123456789'.
+      rv_maxrows = lv_param.
+    ELSE.
+      rv_maxrows = 100.
+    ENDIF.
+
+    IF rv_maxrows > gc_max_rows_hard_limit.
+      rv_maxrows = gc_max_rows_hard_limit.
+    ENDIF.
+    IF rv_maxrows < 1.
+      rv_maxrows = 1.
+    ENDIF.
+
+  ENDMETHOD.
+
+
+  METHOD table_exists.
+
+    SELECT SINGLE tabname FROM dd02l
+      INTO @DATA(lv_dummy)
+      WHERE tabname    = @iv_table
+        AND tabclass   = 'TRANSP'
+        AND as4local   = 'A'.
+
+    rv_exists = xsdbool( sy-subrc = 0 ).
+
+  ENDMETHOD.
+
+
+  METHOD authority_check.
+
+    " Berechtigungsgruppe der Tabelle ermitteln (Standardpruefung wie bei SE16).
+    " Die Zuordnung Tabelle -> Berechtigungsgruppe steht in TDDAT, nicht in DD02L.
+    SELECT SINGLE cclass FROM tddat
+      INTO @DATA(lv_authgrp)
+      WHERE tabname = @iv_table.
+
+    IF lv_authgrp IS INITIAL.
+      lv_authgrp = '&NC&'.  " keine Gruppe zugeordnet -> Standard-Pseudogruppe
+    ENDIF.
+
+    AUTHORITY-CHECK OBJECT 'S_TABU_DIS'
+      ID 'DICBERCLS' FIELD lv_authgrp
+      ID 'ACTVT'     FIELD '03'.
+
+    rv_allowed = xsdbool( sy-subrc = 0 ).
+
+  ENDMETHOD.
+
+
+  METHOD read_table_dynamic.
+
+    DATA: lo_table_descr TYPE REF TO cl_abap_tabledescr,
+          lo_struct_descr TYPE REF TO cl_abap_structdescr,
+          lr_data         TYPE REF TO data.
+
+    FIELD-SYMBOLS: <lt_data> TYPE STANDARD TABLE.
+
+    lo_struct_descr ?= cl_abap_typedescr=>describe_by_name( iv_table ).
+    lo_table_descr   = cl_abap_tabledescr=>create( p_line_type = lo_struct_descr ).
+
+    CREATE DATA lr_data TYPE HANDLE lo_table_descr.
+    ASSIGN lr_data->* TO <lt_data>.
+
+    SELECT * FROM (iv_table)
+      INTO TABLE <lt_data>
+      UP TO iv_maxrows ROWS.
+
+    rv_json = /ui2/cl_json=>serialize( data             = <lt_data>
+                                       compress         = abap_false
+                                       pretty_name      = /ui2/cl_json=>pretty_mode-camel_case ).
+
+  ENDMETHOD.
+
+
+  METHOD send_error.
+
+    DATA(lv_json) = |\{ "error": "{ iv_message }" \}|.
+
+    io_response->set_status( code = iv_code reason = iv_message ).
+    io_response->set_header_field( name = 'content-type' value = 'application/json; charset=utf-8' ).
+    io_response->set_cdata( lv_json ).
+
+  ENDMETHOD.
+
+ENDCLASS.
