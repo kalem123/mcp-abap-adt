@@ -101,8 +101,13 @@ CLASS zcl_tablecontent IMPLEMENTATION.
   METHOD get_table_name.
 
     DATA(lv_path) = io_request->get_header_field( '~path_info' ).
-    " ~path_info liefert alles nach dem SICF-Knoten, z.B. "/CDHDR"
-    SHIFT lv_path LEFT DELETING LEADING '/'.
+    " ~path_info liefert alles nach dem SICF-Knoten, z.B. "/CDHDR" oder "//ASADEV/ACI_FGRF"
+    " (Namespace-Tabellen wie /ASADEV/... haben selbst einen fuehrenden Slash, der NICHT
+    " mitentfernt werden darf - daher nur den einen URL-Pfad-Trenner strippen, nicht alle
+    " fuehrenden Slashes per SHIFT ... DELETING LEADING).
+    IF lv_path IS NOT INITIAL AND lv_path(1) = '/'.
+      lv_path = lv_path+1.
+    ENDIF.
 
     " Falls noch weitere Segmente/Query-Reste enthalten sind: nur erstes Segment nehmen
     FIND REGEX '^[A-Za-z0-9_/]+' IN lv_path MATCH OFFSET DATA(lv_off) MATCH LENGTH DATA(lv_len).
