@@ -7,11 +7,14 @@ import { getConfig, SapConfig } from '../index';
 export { McpError, ErrorCode, AxiosResponse };
 
 export function return_response(response: AxiosResponse) {
+    const text = typeof response.data === 'string'
+        ? response.data
+        : JSON.stringify(response.data, null, 2);
     return {
         isError: false,
         content: [{
             type: 'text',
-            text: response.data
+            text
         }]
     };
 }
