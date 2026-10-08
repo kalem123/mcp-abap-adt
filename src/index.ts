@@ -23,6 +23,7 @@ import { handleGetInclude } from './handlers/handleGetInclude';
 import { handleGetObjectSource } from './handlers/handleGetObjectSource';
 import { handleGetUsageReferences } from './handlers/handleGetUsageReferences';
 import { handleCheckSyntax } from './handlers/handleCheckSyntax';
+import { handleRunQuery } from './handlers/handleRunQuery';
 import { handleGetTypeInfo } from './handlers/handleGetTypeInfo';
 import { handleGetInterface } from './handlers/handleGetInterface';
 import { handleGetTransaction } from './handlers/handleGetTransaction';
@@ -286,6 +287,19 @@ export class mcp_abap_adt_server {
             }
           },
           {
+            name: 'RunQuery',
+            description: 'Run a read-only open SQL SELECT via ADT data preview (database tables and CDS views, with WHERE, joins, aggregates). Only SELECT, one statement. Authorizations of the logged-on user apply',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                sql: { type: 'string', description: 'A single SELECT statement, e.g. SELECT ebeln, bukrs FROM ekko WHERE bedat >= \'20261001\'' },
+                maxRows: { type: 'number', description: 'Maximum number of rows (default 100, max 1000)', default: 100 },
+                sap_system: { type: 'string', description: 'SAP system (e.g. S4H, DHB, DGC, QGC). Default: S4H', default: 'S4H' }
+              },
+              required: ['sql']
+            }
+          },
+          {
             name: 'SearchObject',
             description: 'Search for ABAP objects using quick search',
             inputSchema: {
@@ -501,6 +515,8 @@ export class mcp_abap_adt_server {
           return await handleGetObjectSource(request.params.arguments);
         case 'GetUsageReferences':
           return await handleGetUsageReferences(request.params.arguments);
+        case 'RunQuery':
+          return await handleRunQuery(request.params.arguments);
         case 'CheckSyntax':
           return await handleCheckSyntax(request.params.arguments);
         case 'SearchObject':
