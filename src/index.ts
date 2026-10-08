@@ -24,6 +24,7 @@ import { handleGetObjectSource } from './handlers/handleGetObjectSource';
 import { handleGetUsageReferences } from './handlers/handleGetUsageReferences';
 import { handleCheckSyntax } from './handlers/handleCheckSyntax';
 import { handleRunQuery } from './handlers/handleRunQuery';
+import { handleRunAtc } from './handlers/handleRunAtc';
 import { handleGetTypeInfo } from './handlers/handleGetTypeInfo';
 import { handleGetInterface } from './handlers/handleGetInterface';
 import { handleGetTransaction } from './handlers/handleGetTransaction';
@@ -287,6 +288,20 @@ export class mcp_abap_adt_server {
             }
           },
           {
+            name: 'RunAtc',
+            description: 'ABAP Test Cockpit check of one object (static quality, performance, security findings). Uses the given check variant or the system default. Runs an ATC run on the system; the object is not changed',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                object_url: { type: 'string', description: 'ADT object path (not the source), e.g. /sap/bc/adt/oo/classes/zcl_foo or /sap/bc/adt/programs/programs/zfoo' },
+                check_variant: { type: 'string', description: 'ATC check variant. Default: system default variant' },
+                maxResults: { type: 'number', description: 'Maximum number of findings to return', default: 200 },
+                sap_system: { type: 'string', description: 'SAP system (e.g. S4H, DHB, DGC, QGC). Default: S4H', default: 'S4H' }
+              },
+              required: ['object_url']
+            }
+          },
+          {
             name: 'RunQuery',
             description: 'Run a read-only open SQL SELECT via ADT data preview (database tables and CDS views, with WHERE, joins, aggregates). Only SELECT, one statement. Authorizations of the logged-on user apply',
             inputSchema: {
@@ -515,6 +530,8 @@ export class mcp_abap_adt_server {
           return await handleGetObjectSource(request.params.arguments);
         case 'GetUsageReferences':
           return await handleGetUsageReferences(request.params.arguments);
+        case 'RunAtc':
+          return await handleRunAtc(request.params.arguments);
         case 'RunQuery':
           return await handleRunQuery(request.params.arguments);
         case 'CheckSyntax':
