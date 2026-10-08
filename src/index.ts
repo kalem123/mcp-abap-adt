@@ -22,6 +22,7 @@ import { handleGetPackage } from './handlers/handleGetPackage';
 import { handleGetInclude } from './handlers/handleGetInclude';
 import { handleGetObjectSource } from './handlers/handleGetObjectSource';
 import { handleGetUsageReferences } from './handlers/handleGetUsageReferences';
+import { handleCheckSyntax } from './handlers/handleCheckSyntax';
 import { handleGetTypeInfo } from './handlers/handleGetTypeInfo';
 import { handleGetInterface } from './handlers/handleGetInterface';
 import { handleGetTransaction } from './handlers/handleGetTransaction';
@@ -271,6 +272,20 @@ export class mcp_abap_adt_server {
             }
           },
           {
+            name: 'CheckSyntax',
+            description: 'Syntax check via ADT check run (read-only, writes nothing). Without source the saved object is checked; with source the given unsaved code is checked against the object. Returns errors/warnings with line and column',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                object_source_url: { type: 'string', description: 'ADT source URL, e.g. /sap/bc/adt/oo/classes/zcl_foo/source/main or /sap/bc/adt/functions/groups/{fg}/fmodules/{fm}/source/main' },
+                source: { type: 'string', description: 'Optional: unsaved source code to check instead of the saved version' },
+                version: { type: 'string', enum: ['active', 'inactive'], description: 'Version to check when no source is given. Default: active', default: 'active' },
+                sap_system: { type: 'string', description: 'SAP system (e.g. S4H, DHB, DGC, QGC). Default: S4H', default: 'S4H' }
+              },
+              required: ['object_source_url']
+            }
+          },
+          {
             name: 'SearchObject',
             description: 'Search for ABAP objects using quick search',
             inputSchema: {
@@ -486,6 +501,8 @@ export class mcp_abap_adt_server {
           return await handleGetObjectSource(request.params.arguments);
         case 'GetUsageReferences':
           return await handleGetUsageReferences(request.params.arguments);
+        case 'CheckSyntax':
+          return await handleCheckSyntax(request.params.arguments);
         case 'SearchObject':
           return await handleSearchObject(request.params.arguments);
         case 'GetInterface':
