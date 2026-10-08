@@ -20,6 +20,8 @@ import { handleGetStructure } from './handlers/handleGetStructure';
 import { handleGetTableContents } from './handlers/handleGetTableContents';
 import { handleGetPackage } from './handlers/handleGetPackage';
 import { handleGetInclude } from './handlers/handleGetInclude';
+import { handleGetObjectSource } from './handlers/handleGetObjectSource';
+import { handleGetUsageReferences } from './handlers/handleGetUsageReferences';
 import { handleGetTypeInfo } from './handlers/handleGetTypeInfo';
 import { handleGetInterface } from './handlers/handleGetInterface';
 import { handleGetTransaction } from './handlers/handleGetTransaction';
@@ -230,6 +232,42 @@ export class mcp_abap_adt_server {
                 sap_system: { type: 'string', description: 'SAP system (e.g. S4H, DHB, DGC, QGC). Default: S4H', default: 'S4H' }
               },
               required: ['include_name']
+            }
+          },
+          {
+            name: 'GetObjectSource',
+            description: 'Retrieve source (read-only) of class local includes (definitions, implementations, macros, testclasses), behavior definitions (bdef), CDS DDL sources (ddls) or service definitions (srvd)',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                object_name: { type: 'string', description: 'Name of the object (e.g. ZBP_I_PO, ZI_PO)' },
+                object_type: {
+                  type: 'string',
+                  enum: ['class_definitions', 'class_implementations', 'class_macros', 'class_testclasses', 'bdef', 'ddls', 'srvd'],
+                  description: 'Kind of source to read. class_implementations = Local Types (CCIMP) of a behavior pool'
+                },
+                sap_system: { type: 'string', description: 'SAP system (e.g. S4H, DHB, DGC, QGC). Default: S4H', default: 'S4H' }
+              },
+              required: ['object_name', 'object_type']
+            }
+          },
+          {
+            name: 'GetUsageReferences',
+            description: 'Where-used list: find all objects that use a given ABAP object (read-only). Identify the object by object_url (ADT path, e.g. /sap/bc/adt/oo/classes/zcl_foo) or by object_name + object_type',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                object_url: { type: 'string', description: 'ADT object path starting with /sap/bc/adt/ (alternative to object_name + object_type)' },
+                object_name: { type: 'string', description: 'Name of the object (e.g. ZCL_FOO)' },
+                object_type: {
+                  type: 'string',
+                  enum: ['class', 'interface', 'program', 'include', 'function_group', 'function', 'table', 'structure', 'data_element', 'domain', 'ddls'],
+                  description: 'Kind of object. For function also pass function_group'
+                },
+                function_group: { type: 'string', description: 'Function group, required when object_type is function' },
+                maxResults: { type: 'number', description: 'Maximum number of references to return', default: 200 },
+                sap_system: { type: 'string', description: 'SAP system (e.g. S4H, DHB, DGC, QGC). Default: S4H', default: 'S4H' }
+              }
             }
           },
           {
@@ -444,6 +482,10 @@ export class mcp_abap_adt_server {
           return await handleGetTypeInfo(request.params.arguments);
         case 'GetInclude':
           return await handleGetInclude(request.params.arguments);
+        case 'GetObjectSource':
+          return await handleGetObjectSource(request.params.arguments);
+        case 'GetUsageReferences':
+          return await handleGetUsageReferences(request.params.arguments);
         case 'SearchObject':
           return await handleSearchObject(request.params.arguments);
         case 'GetInterface':
