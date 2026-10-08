@@ -25,6 +25,7 @@ import { handleGetUsageReferences } from './handlers/handleGetUsageReferences';
 import { handleCheckSyntax } from './handlers/handleCheckSyntax';
 import { handleRunQuery } from './handlers/handleRunQuery';
 import { handleRunAtc } from './handlers/handleRunAtc';
+import { handleRunUnitTests } from './handlers/handleRunUnitTests';
 import { handleGetTypeInfo } from './handlers/handleGetTypeInfo';
 import { handleGetInterface } from './handlers/handleGetInterface';
 import { handleGetTransaction } from './handlers/handleGetTransaction';
@@ -288,6 +289,19 @@ export class mcp_abap_adt_server {
             }
           },
           {
+            name: 'RunUnitTests',
+            description: 'Run ABAP Unit tests of one object (class, program). By default only tests with risk level harmless run, because dangerous/critical tests may change data on the system. Returns passed/failed per test method with assertion messages',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                object_url: { type: 'string', description: 'ADT object path (not the source), e.g. /sap/bc/adt/oo/classes/zcl_foo' },
+                include_risky: { type: 'boolean', description: 'Also run tests with risk level dangerous/critical (may change data). Default: false', default: false },
+                sap_system: { type: 'string', description: 'SAP system (e.g. S4H, DHB, DGC, QGC). Default: S4H', default: 'S4H' }
+              },
+              required: ['object_url']
+            }
+          },
+          {
             name: 'RunAtc',
             description: 'ABAP Test Cockpit check of one object (static quality, performance, security findings). Uses the given check variant or the system default. Runs an ATC run on the system; the object is not changed',
             inputSchema: {
@@ -530,6 +544,8 @@ export class mcp_abap_adt_server {
           return await handleGetObjectSource(request.params.arguments);
         case 'GetUsageReferences':
           return await handleGetUsageReferences(request.params.arguments);
+        case 'RunUnitTests':
+          return await handleRunUnitTests(request.params.arguments);
         case 'RunAtc':
           return await handleRunAtc(request.params.arguments);
         case 'RunQuery':
