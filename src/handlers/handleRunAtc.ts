@@ -71,8 +71,8 @@ export async function handleRunAtc(args: any) {
         if (!variant) {
             const customizing = await makeAdtRequest(`${base}/sap/bc/adt/atc/customizing`, 'GET', 30000, undefined, undefined, system, { 'Accept': 'application/xml' });
             const xml = asText(customizing.data);
-            variant = xml.match(/key="systemCheckVariant"[^>]*value="([^"]*)"/i)?.[1]
-                || xml.match(/value="([^"]*)"[^>]*key="systemCheckVariant"/i)?.[1]
+            variant = xml.match(/(?:name|key)="systemCheckVariant"[^>]*value="([^"]*)"/i)?.[1]
+                || xml.match(/value="([^"]*)"[^>]*(?:name|key)="systemCheckVariant"/i)?.[1]
                 || '';
             if (!variant) {
                 throw new McpError(ErrorCode.InvalidParams, `No check variant given and no system default found; pass check_variant. Customizing response: ${xml.slice(0, 1500)}`);
